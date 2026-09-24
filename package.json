@@ -1,0 +1,41 @@
+{
+  "name": "contextor",
+  "version": "0.1.0",
+  "description": "A model-and-vendor-agnostic proxy that sits between a coding agent and its model API, deduplicating repeated file reads/tool outputs already seen in the conversation to cut token spend, with a transparent log of what got dropped and why.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "contextor": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "pretest": "npm run build"
+  },
+  "keywords": [
+    "llm",
+    "proxy",
+    "anthropic",
+    "claude",
+    "token-savings",
+    "dedup",
+    "context-window",
+    "agent"
+  ],
+  "dependencies": {
+    "gpt-tokenizer": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "vitest": "^5.0.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
