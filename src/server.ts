@@ -149,6 +149,14 @@ async function handleRequest(
     method,
     headers: collectRequestHeaders(req),
     body: hasBody ? body : undefined,
+    // Never let `fetch` silently follow a redirect: `collectRequestHeaders`
+    // forwards the client's original auth header (e.g. `x-api-key`)
+    // untouched, and fetch's cross-origin sensitive-header stripping only
+    // covers Authorization/Cookie/Proxy-Authorization — not that header. A
+    // misconfigured/hijacked/compromised upstream returning a 3xx could
+    // otherwise cause the real API key to be sent to an arbitrary host.
+    // Fail the request instead; the outer .catch() turns this into a 502.
+    redirect: "error",
   });
 
   res.writeHead(upstreamResponse.status, collectResponseHeaders(upstreamResponse));
@@ -183,9 +191,15 @@ export function createServer(options: ServeOptions): http.Server {
   return http.createServer((req, res) => {
     handleRequest(req, res, memory, options).catch((err: unknown) => {
       process.stderr.write(`[contextor] error handling request: ${String(err)}\n`);
-      if (!res.headersSent) {
-        res.writeHead(502, { "content-type": "application/json" });
+      if (res.headersSent) {
+        // Headers (and possibly part of the body) were already written —
+        // e.g. an error event from the piped upstream stream after
+        // `res.writeHead()` ran. Appending a fresh JSON error body onto an
+        // in-progress response would just corrupt it; terminate instead.
+        res.destroy(err instanceof Error ? err : new Error(String(err)));
+        return;
       }
+      res.writeHead(502, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: { type: "contextor_proxy_error", message: String(err) } }));
     });
   });
