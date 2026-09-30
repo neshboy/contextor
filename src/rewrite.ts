@@ -142,8 +142,13 @@ function tryDedupBlock(
  * leaves those untouched. See README Limitations.
  */
 function toolResultText(content: string | AnthropicContentBlock[] | undefined): string | undefined {
-  if (content === undefined) return undefined;
   if (typeof content === "string") return content;
+  // Per the file's own contract, only rewrite shapes we're confident we
+  // understand (string or array). `content` is parsed straight out of an
+  // untrusted JSON request body, so at runtime it may not match the
+  // string|array|undefined the TypeScript type promises (e.g. null, a
+  // number, a boolean) — fall through to "leave untouched" for those too.
+  if (!Array.isArray(content)) return undefined;
   if (content.every(isTextBlock)) {
     return content.map((block) => block.text).join("\n");
   }
@@ -158,6 +163,13 @@ function rewriteMessage(
   if (typeof message.content === "string") {
     const replaced = tryDedupBlock(message.content, messageIndex, message.role, 0, "message_string", ctx);
     return replaced === undefined ? message : { ...message, content: replaced };
+  }
+
+  // As in toolResultText above: `message.content` comes from untrusted JSON
+  // and may not actually be an array at runtime despite the TS type. Leave
+  // anything that isn't exactly string|array untouched rather than crashing.
+  if (!Array.isArray(message.content)) {
+    return message;
   }
 
   const content = message.content.map((block, blockIndex): AnthropicContentBlock => {
